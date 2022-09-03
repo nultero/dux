@@ -1,71 +1,39 @@
 mod dir_fns;
+mod display;
 
 use std::collections::HashMap;
+use std::fs::read_dir;
 use dir_fns::*;
+use display::*;
 
-const KB: u64 = 1000;
-const MB: u64 = 1000 * KB;
-const GB: u64 = 1000 * MB;
+fn cwd_size(map: &mut HashMap<u64, String>) {
+    let wpath = std::env::current_dir()
+                    .expect("couldn't get current dir path");
+    
+    let cwd = read_dir(wpath).expect("couldn't get current dir");
 
-fn wd_size() {
-    let mut hm: HashMap<u64, String> = HashMap::with_capacity(40);
-    let wd = std::env::current_dir()
-                    .expect("couldn't get current dir");
-
-    get_dir_sz_m(wd, &mut hm);
-
-    let mut sizes: Vec<&u64> = hm.keys().collect();
-    sizes.sort();
-
-    let mut sz_strs: Vec<String>    = vec![String::new(); sizes.len()];
-    let mut file_names: Vec<String> = vec![String::new(); sizes.len()];
-    let mut mx_len = 0;
-
-    for (i, sz) in sizes.iter().enumerate() {
-        let f = hm.get(sz);
-        if let Some(fname) = f {
-            let fsz = fmtsz(sz);
-            if fsz.len() > mx_len {
-                mx_len = fsz.len();
+    for e in cwd {
+        let entry = e.expect("problem converting filename to direntry");
+        let f = &entry.file_name();
+        let sz = get_file_sz(entry);
+        let fopt = f.to_str();
+        if let Some(name) = fopt {
+            let opt = map.insert(sz, name.to_owned());
+            match opt {
+            Some(_) => {},
+            None => {}
             }
-
-            sz_strs[i] = fsz;
-            file_names[i] = fname.as_str().to_owned();
         }
-    }
-
-    mx_len += 3;
-
-    for (i, sz) in sz_strs.iter().enumerate() {
-        println!(
-            " {}:{}{}",
-            sz, 
-            " ".repeat(mx_len - sz.len()),
-            file_names[i],
-        );
     }
 }
 
 fn main() {
+    let mut map: HashMap<u64, String> = HashMap::with_capacity(40);
     let args: Vec<String> = std::env::args().skip(1).collect();
 
     if args.len() == 0 {
-        wd_size();
-        return;
+        cwd_size(&mut map);
     }
 
-
-    for arg in args {
-        println!("{}", arg);
-    }
-}
-
-
-fn fmtsz(bytes: &u64) -> String {
-    match bytes {
-        GB..  => {   return format!("{} GB", bytes/GB);  }
-        MB..  => {   return format!("{} MB", bytes/MB);  }
-        KB..  => {   return format!("{} KB", bytes/KB);  }
-        _     => {   return format!("{} B", bytes);  }
-    }
+    display(map);
 }
